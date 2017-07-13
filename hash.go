@@ -144,7 +144,7 @@ func (k *ketama) Get(h Hasher) (*grpc.Address, error) {
 	}
 	hash32 := h.Hash32()
 	idx := sort.Search(length, func(i int) bool {
-		return k.sortedHashSet[i] == hash32
+		return k.sortedHashSet[i] >= hash32
 	})
 	if idx >= length {
 		idx = 0
