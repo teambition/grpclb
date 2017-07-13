@@ -25,13 +25,13 @@ func main() {
 	flag.Parse()
 	etcdClient, err := clientv3.New(clientv3.Config{Endpoints: strings.Split(*etcd, ",")})
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	r := &etcdnaming.GRPCResolver{Client: etcdClient}
 	b := grpclb.NewKetamaBalance(r)
 	conn, err := grpc.Dial(*service, grpc.WithBalancer(b), grpc.WithInsecure(), grpc.WithDefaultCallOptions(grpc.FailFast(false)))
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	defer conn.Close()
 	c := helloworld.NewGreeterClient(conn)
