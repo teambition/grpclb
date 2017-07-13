@@ -1,19 +1,10 @@
 package grpclb
 
-// Metadata meta type store into address.Metadata
-type Metadata interface {
-	Weight() weightLvl
-}
-
-// weightLvl the weight level of endpoint
-type weightLvl int
-
-func (w weightLvl) Weight() weightLvl {
-	return w
-}
+// WeightLvl the weight level of endpoint
+type WeightLvl int
 
 const (
-	Level1 weightLvl = (iota + 1) * 100
+	Level1 WeightLvl = (iota + 1) * 100
 	Level2
 	Level3
 	Level4
@@ -25,12 +16,12 @@ const (
 	Level10
 )
 
-func getWeight(meta interface{}) weightLvl {
-	var w weightLvl
-	if m, ok := meta.(Metadata); ok {
-		w = m.Weight()
+func getWeight(meta interface{}) WeightLvl {
+	var w WeightLvl
+	if m, ok := meta.(float64); ok {
+		w = WeightLvl(m)
 	}
-	if w == 0 {
+	if w <= Level1 {
 		w = Level1
 	}
 	return w

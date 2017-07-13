@@ -18,18 +18,18 @@ var (
 	// ErrServerExisted the server has existed when add to ConsistentHasher.
 	ErrServerExisted = errors.New("consistent hasher: Server has existed")
 	// ErrUnsupportOp operation must be in Add or Delete
-	ErrUnsupportOp = errors.New("consistent hasher: Unsupport operation, must be in Add or Delete")
+	ErrUnsupportOp = errors.New("consistent hasher: Unsupport operation, must be one of Add or Delete")
 )
 
 // ConsistentHasher the implemention of consistent hash algorithm.
 type ConsistentHasher interface {
 	// Update servers.
-	Update(*naming.Update) error
+	Update(naming.Update) error
 	// Servers get all servers in the ConsistentHasher.
 	Servers() []grpc.Address
 	// Get the target Address by Hasher
 	// which is a hash factor for ensure the same key gets the same Node.
-	Get(Hasher) (*grpc.Address, error)
+	Get(Hasher) (grpc.Address, error)
 }
 
 // ketama ConsistentHasher implment with ketama algorithm.
@@ -104,11 +104,11 @@ func (k *ketama) checkExist(u *naming.Update) bool {
 	return false
 }
 
-func (k *ketama) Update(u *naming.Update) error {
+func (k *ketama) Update(u naming.Update) error {
 	k.Lock()
 	defer k.Unlock()
 
-	if k.checkExist(u) {
+	if k.checkExist(&u) {
 		return ErrServerExisted
 	}
 	a := &grpc.Address{Addr: u.Addr, Metadata: u.Metadata}
@@ -134,13 +134,13 @@ func (k *ketama) Servers() []grpc.Address {
 	return as
 }
 
-func (k *ketama) Get(h Hasher) (*grpc.Address, error) {
+func (k *ketama) Get(h Hasher) (grpc.Address, error) {
 	k.RLock()
 	defer k.RUnlock()
 
 	length := len(k.sortedHashSet)
 	if length == 0 {
-		return nil, ErrNoServer
+		return grpc.Address{}, ErrNoServer
 	}
 	hash32 := h.Hash32()
 	idx := sort.Search(length, func(i int) bool {
@@ -150,5 +150,5 @@ func (k *ketama) Get(h Hasher) (*grpc.Address, error) {
 		idx = 0
 	}
 	n := k.replica[k.sortedHashSet[idx]]
-	return n, nil
+	return *n, nil
 }

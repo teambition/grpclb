@@ -7,17 +7,25 @@ import (
 	"golang.org/x/net/context"
 )
 
+// HasherFromContext parse Hasher from context.
+type HasherFromContext func(context.Context) (Hasher, bool)
+
 // Hasher hash method implemention
 type Hasher interface {
 	// Hash32 uint32 result
 	Hash32() uint32
 }
 
-type anyType struct {
+type strOrNum struct {
 	hash32 uint32
 }
 
-func newAnyType(value interface{}) (Hasher, bool) {
+// Hash32 Hasher implement with fnv algorithm.
+func (s *strOrNum) Hash32() uint32 {
+	return s.hash32
+}
+
+func newStrOrNum(value interface{}) (Hasher, bool) {
 	var data []byte
 	switch v := value.(type) {
 	case string:
@@ -29,20 +37,19 @@ func newAnyType(value interface{}) (Hasher, bool) {
 	}
 	h := fnv.New32a()
 	h.Write(data)
-	return &anyType{hash32: h.Sum32()}, true
+	return &strOrNum{hash32: h.Sum32()}, true
 }
 
-// Hash32 Hasher implement with fnv algorithm.
-func (a *anyType) Hash32() uint32 {
-	return a.hash32
+type contextKey struct{}
+
+var strOrNumKey = contextKey{}
+
+// strOrNumFromContext get Hasher from Context by key.
+func strOrNumFromContext(ctx context.Context) (Hasher, bool) {
+	return newStrOrNum(ctx.Value(strOrNumKey))
 }
 
-// fromContext get Hasher from Context by key.
-func fromContext(ctx context.Context, key interface{}) (Hasher, bool) {
-	return newAnyType(ctx.Value(key))
-}
-
-// ToContext set Hasher into Context.
-func ToContext(ctx context.Context, key, val interface{}) context.Context {
-	return context.WithValue(ctx, key, val)
+// StrOrNumToContext set string or number into Context.
+func StrOrNumToContext(ctx context.Context, val interface{}) context.Context {
+	return context.WithValue(ctx, strOrNumKey, val)
 }

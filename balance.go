@@ -1,7 +1,9 @@
 package grpclb
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/tevino/abool"
 	"golang.org/x/net/context"
@@ -12,27 +14,34 @@ import (
 
 type balance struct {
 	addrsCh chan []grpc.Address
+	waitL   sync.RWMutex
+	waitCh  chan struct{}
 	done    *abool.AtomicBool
+	f       HasherFromContext
 	h       ConsistentHasher
 	r       naming.Resolver
 	w       naming.Watcher
-	key     interface{}
 }
 
 // NewKetamaBalance balance with ketama algorithm.
-func NewKetamaBalance(key interface{}, r naming.Resolver) grpc.Balancer {
-	return NewBalance(newKetama(), key, r)
+func NewKetamaBalance(r naming.Resolver, f ...HasherFromContext) grpc.Balancer {
+	return NewBalance(newKetama(), r)
 }
 
 // NewBalance create a grpc.Balancer with given ConsistentHasher, watched key in Context and naming.Reslover.
-func NewBalance(h ConsistentHasher, key interface{}, r naming.Resolver) grpc.Balancer {
-	return &balance{
+func NewBalance(h ConsistentHasher, r naming.Resolver, f ...HasherFromContext) grpc.Balancer {
+	b := &balance{
 		addrsCh: make(chan []grpc.Address, 1),
 		done:    abool.New(),
 		h:       h,
 		r:       r,
-		key:     key,
 	}
+	if len(f) > 0 {
+		b.f = f[0]
+	} else {
+		b.f = strOrNumFromContext
+	}
+	return b
 }
 
 func (b *balance) watchAddrUpdates() error {
@@ -43,20 +52,37 @@ func (b *balance) watchAddrUpdates() error {
 	}
 
 	for _, u := range us {
-		if err := b.h.Update(u); err != nil {
+		if err := b.h.Update(*u); err != nil {
 			grpclog.Printf("grpc: The name resolver updates fail due to %v by address(%s) and operation(%d).\n", err, u.Addr, u.Op)
 		}
 	}
 
+	as := b.h.Servers()
+	b.waitL.Lock()
+	if len(as) == 0 {
+		if b.waitCh == nil {
+			b.waitCh = make(chan struct{})
+		}
+	} else {
+		if b.waitCh != nil {
+			close(b.waitCh)
+			b.waitCh = nil
+		}
+	}
+	b.waitL.Unlock()
 	select {
 	case <-b.addrsCh:
 	default:
 	}
-	b.addrsCh <- b.h.Servers()
+	b.addrsCh <- as
 	return nil
 }
 
 func (b *balance) Start(target string, _ grpc.BalancerConfig) (err error) {
+	if b.done.IsSet() {
+		return grpc.ErrClientConnClosing
+	}
+
 	if b.w, err = b.r.Resolve(target); err != nil {
 		return
 	}
@@ -77,17 +103,35 @@ func (b *balance) Up(addr grpc.Address) (down func(error)) {
 	return nil
 }
 
+func (b *balance) get(h Hasher) (addr grpc.Address, err error) {
+	if b.done.IsSet() {
+		err = grpc.ErrClientConnClosing
+		return
+	}
+	return b.h.Get(h)
+}
+
 func (b *balance) Get(ctx context.Context, opts grpc.BalancerGetOptions) (addr grpc.Address, put func(), err error) {
-	h, ok := fromContext(ctx, b.key)
+	h, ok := b.f(ctx)
 	if !ok {
-		err = fmt.Errorf("grpc: the key(%v) is not in the context", b.key)
+		err = fmt.Errorf("grpc: the activeHashKey is not in the context")
 		return
 	}
-	a, err := b.h.Get(h)
-	if err != nil {
-		return
+	if opts.BlockingWait {
+		b.waitL.Lock()
+		ch := b.waitCh
+		b.waitL.Unlock()
+		if ch != nil {
+			select {
+			case <-ctx.Done():
+				err = ctx.Err()
+			case <-ch:
+				addr, err = b.get(h)
+			}
+			return
+		}
 	}
-	addr = *a
+	addr, err = b.get(h)
 	return
 }
 
@@ -96,6 +140,20 @@ func (b *balance) Notify() <-chan []grpc.Address {
 }
 
 func (b *balance) Close() error {
-	b.done.Set()
+	if !b.done.SetToIf(false, true) {
+		return errors.New("grpc: balancer is closed")
+	}
+	if b.w != nil {
+		b.w.Close()
+	}
+	b.waitL.Lock()
+	if b.waitCh != nil {
+		close(b.waitCh)
+		b.waitCh = nil
+	}
+	b.waitL.Unlock()
+	if b.addrsCh != nil {
+		close(b.addrsCh)
+	}
 	return nil
 }
