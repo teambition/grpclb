@@ -110,9 +110,9 @@ func (b *balance) Get(ctx context.Context, opts grpc.BalancerGetOptions) (addr g
 		return
 	}
 	if opts.BlockingWait {
-		b.waitL.Lock()
+		b.waitL.RLock()
 		ch := b.waitCh
-		b.waitL.Unlock()
+		b.waitL.RUnlock()
 		if ch != nil {
 			select {
 			case <-ctx.Done():
