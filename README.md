@@ -1,4 +1,4 @@
-# External Load Balancing for gprc
+# Grpc Load Balancing
 
 ## Features
 
