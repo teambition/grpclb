@@ -4,3 +4,4 @@
 
 - Scalability
 - IOP
+- Minimized lock
