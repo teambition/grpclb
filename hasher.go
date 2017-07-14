@@ -7,6 +7,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+var _ Hasher = new(strOrNum)
+
 // HasherFromContext parse Hasher from context.
 type HasherFromContext func(context.Context) (Hasher, bool)
 
@@ -25,7 +27,7 @@ func (s *strOrNum) Hash32() uint32 {
 	return s.hash32
 }
 
-func newStrOrNum(value interface{}) (Hasher, bool) {
+func newStrOrNum(value interface{}) (*strOrNum, bool) {
 	var data []byte
 	switch v := value.(type) {
 	case string:

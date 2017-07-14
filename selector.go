@@ -12,6 +12,8 @@ import (
 	"google.golang.org/grpc/naming"
 )
 
+var _ ServerSelector = new(ketama)
+
 var (
 	// ErrNoServer when no server has found then return error.
 	ErrNoServer = errors.New("server selector: There is no server")
@@ -27,7 +29,7 @@ var (
 type ServerSelector interface {
 	// Update servers.
 	Update(naming.Update) error
-	// Servers get all servers in the Decider.
+	// Servers get all servers in the ServerSelector.
 	Servers() []grpc.Address
 	// Get the target Address by Hasher
 	// which is a hash factor for ensure the same key gets the same Node.
