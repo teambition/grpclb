@@ -103,14 +103,6 @@ func (b *balance) Up(addr grpc.Address) (down func(error)) {
 	return nil
 }
 
-func (b *balance) get(h Hasher) (addr grpc.Address, err error) {
-	if b.done.IsSet() {
-		err = grpc.ErrClientConnClosing
-		return
-	}
-	return b.h.Get(h)
-}
-
 func (b *balance) Get(ctx context.Context, opts grpc.BalancerGetOptions) (addr grpc.Address, put func(), err error) {
 	h, ok := b.f(ctx)
 	if !ok {
@@ -126,12 +118,15 @@ func (b *balance) Get(ctx context.Context, opts grpc.BalancerGetOptions) (addr g
 			case <-ctx.Done():
 				err = ctx.Err()
 			case <-ch:
-				addr, err = b.get(h)
+				// wait util there is a new registry server.
 			}
-			return
 		}
 	}
-	addr, err = b.get(h)
+	if b.done.IsSet() {
+		err = grpc.ErrClientConnClosing
+		return
+	}
+	addr, err = b.h.Get(h)
 	return
 }
 
