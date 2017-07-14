@@ -15,24 +15,26 @@ import (
 var (
 	// ErrNoServer when no server has found then return error.
 	ErrNoServer = errors.New("consistent hasher: There is no server")
-	// ErrServerExisted the server has existed when add to ConsistentHasher.
+	// ErrServerExisted the server has existed when add to the ServerSelector.
 	ErrServerExisted = errors.New("consistent hasher: Server has existed")
+	// ErrServerNotExisted the server has not existed when delete from ServerSelector.
+	ErrServerNotExisted = errors.New("consistent hasher: Server has not existed")
 	// ErrUnsupportOp operation must be in Add or Delete
 	ErrUnsupportOp = errors.New("consistent hasher: Unsupport operation, must be one of Add or Delete")
 )
 
-// ConsistentHasher the implemention of consistent hash algorithm.
-type ConsistentHasher interface {
+// ServerSelector decide which server can be used.
+type ServerSelector interface {
 	// Update servers.
 	Update(naming.Update) error
-	// Servers get all servers in the ConsistentHasher.
+	// Servers get all servers in the Decider.
 	Servers() []grpc.Address
 	// Get the target Address by Hasher
 	// which is a hash factor for ensure the same key gets the same Node.
 	Get(Hasher) (grpc.Address, error)
 }
 
-// ketama ConsistentHasher implment with ketama algorithm.
+// ketama consisten-hash implment with ketama algorithm.
 type ketama struct {
 	sync.RWMutex
 	servers       []*grpc.Address
@@ -40,8 +42,8 @@ type ketama struct {
 	sortedHashSet []uint32
 }
 
-// newKetama init ketema consistent hash
-func newKetama() ConsistentHasher {
+// newKetama init ketema consistent-hash
+func newKetama() *ketama {
 	return &ketama{
 		servers:       []*grpc.Address{},
 		replica:       map[uint32]*grpc.Address{},
@@ -96,7 +98,7 @@ func (k *ketama) delete(a *grpc.Address) {
 }
 
 func (k *ketama) checkExist(u *naming.Update) bool {
-	for _, r := range k.replica {
+	for _, r := range k.servers {
 		if r.Addr == u.Addr {
 			return true
 		}
@@ -108,14 +110,17 @@ func (k *ketama) Update(u naming.Update) error {
 	k.Lock()
 	defer k.Unlock()
 
-	if k.checkExist(&u) {
-		return ErrServerExisted
-	}
 	a := &grpc.Address{Addr: u.Addr, Metadata: u.Metadata}
 	switch u.Op {
 	case naming.Add:
+		if k.checkExist(&u) {
+			return ErrServerExisted
+		}
 		k.add(a)
 	case naming.Delete:
+		if !k.checkExist(&u) {
+			return ErrServerNotExisted
+		}
 		k.delete(a)
 	default:
 		return ErrUnsupportOp

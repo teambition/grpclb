@@ -18,7 +18,7 @@ type balance struct {
 	waitCh  chan struct{}
 	done    *abool.AtomicBool
 	f       HasherFromContext
-	h       ConsistentHasher
+	s       ServerSelector
 	r       naming.Resolver
 	w       naming.Watcher
 }
@@ -29,11 +29,11 @@ func NewKetamaBalance(r naming.Resolver, f ...HasherFromContext) grpc.Balancer {
 }
 
 // NewBalance create a grpc.Balancer with given ConsistentHasher, watched key in Context and naming.Reslover.
-func NewBalance(h ConsistentHasher, r naming.Resolver, f ...HasherFromContext) grpc.Balancer {
+func NewBalance(s ServerSelector, r naming.Resolver, f ...HasherFromContext) grpc.Balancer {
 	b := &balance{
 		addrsCh: make(chan []grpc.Address, 1),
 		done:    abool.New(),
-		h:       h,
+		s:       s,
 		r:       r,
 	}
 	if len(f) > 0 {
@@ -52,12 +52,12 @@ func (b *balance) watchAddrUpdates() error {
 	}
 
 	for _, u := range us {
-		if err := b.h.Update(*u); err != nil {
+		if err := b.s.Update(*u); err != nil {
 			grpclog.Printf("grpc: The name resolver updates fail due to %v by address(%s) and operation(%d).\n", err, u.Addr, u.Op)
 		}
 	}
 
-	as := b.h.Servers()
+	as := b.s.Servers()
 	b.waitL.Lock()
 	if len(as) == 0 {
 		if b.waitCh == nil {
@@ -126,7 +126,7 @@ func (b *balance) Get(ctx context.Context, opts grpc.BalancerGetOptions) (addr g
 		err = grpc.ErrClientConnClosing
 		return
 	}
-	addr, err = b.h.Get(h)
+	addr, err = b.s.Get(h)
 	return
 }
 
