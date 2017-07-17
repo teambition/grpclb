@@ -34,6 +34,9 @@ func Test_newStrOrNum(t *testing.T) {
 	type args struct {
 		value interface{}
 	}
+
+	var nilT *strOrNum
+
 	tests := []struct {
 		name  string
 		args  args
@@ -42,7 +45,7 @@ func Test_newStrOrNum(t *testing.T) {
 	}{
 		{"string key", args{"key"}, &strOrNum{1746258028}, true},
 		{"uint32 key", args{uint32(123)}, &strOrNum{1916298011}, true},
-		{"unsupport type", args{123}, nil, false},
+		{"unsupport type", args{123}, nilT, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

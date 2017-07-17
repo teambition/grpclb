@@ -25,7 +25,7 @@ type balance struct {
 
 // NewKetamaBalance balance with ketama algorithm.
 func NewKetamaBalance(r naming.Resolver, f ...HasherFromContext) grpc.Balancer {
-	return NewBalance(newKetama(), r)
+	return NewBalance(newKetama(), r, f...)
 }
 
 // NewBalance create a grpc.Balancer with given ConsistentHasher, watched key in Context and naming.Reslover.
