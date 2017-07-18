@@ -9,10 +9,10 @@ import (
 	"strings"
 	"syscall"
 
-	"code.teambition.com/soa/go-lib/grpc/grpclb"
-	"code.teambition.com/soa/go-lib/grpc/grpclb/examples/helloworld"
 	"github.com/coreos/etcd/clientv3"
 	etcdnaming "github.com/coreos/etcd/clientv3/naming"
+	"github.com/teambition/grpclb"
+	"github.com/teambition/grpclb/examples/helloworld"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )

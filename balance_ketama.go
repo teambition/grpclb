@@ -46,11 +46,6 @@ func NewKetamaBalance(r naming.Resolver, f ...HasherFromContext) grpc.Balancer {
 	return kb
 }
 
-func (kb *ketamaBalance) checkExisted(addr string) bool {
-	_, ok := kb.servers[addr]
-	return ok
-}
-
 func (kb *ketamaBalance) add(s *server) {
 	addr := s.addr.Addr
 	if _, ok := kb.servers[addr]; ok {
