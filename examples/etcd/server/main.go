@@ -9,10 +9,10 @@ import (
 	"strings"
 	"syscall"
 
+	"code.teambition.com/soa/go-lib/grpc/grpclb"
+	"code.teambition.com/soa/go-lib/grpc/grpclb/examples/helloworld"
 	"github.com/coreos/etcd/clientv3"
 	etcdnaming "github.com/coreos/etcd/clientv3/naming"
-	"github.com/teambition/grpclb"
-	"github.com/teambition/grpclb/examples/helloworld"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -26,17 +26,17 @@ var (
 
 func etcdAdd(c *clientv3.Client, service, addr string, weight int) error {
 	r := &etcdnaming.GRPCResolver{Client: c}
-	return r.Update(c.Ctx(), service, grpclb.NewAddUpdate(addr, grpclb.WeightLvl(weight)))
+	return r.Update(c.Ctx(), service, grpclb.AddServer(addr, grpclb.WeightLvl(weight)))
 }
 
 func etcdDelete(c *clientv3.Client, service, addr string) error {
 	r := &etcdnaming.GRPCResolver{Client: c}
-	return r.Update(c.Ctx(), service, grpclb.NewDeleteUpdate(addr))
+	return r.Update(c.Ctx(), service, grpclb.DeleteServer(addr))
 }
 
-func etcdLeaseAdd(c *clientv3.Client, lid clientv3.LeaseID, service, addr string) error {
+func etcdLeaseAdd(c *clientv3.Client, lid clientv3.LeaseID, service, addr string, weight int) error {
 	r := &etcdnaming.GRPCResolver{Client: c}
-	return r.Update(c.Ctx(), service, grpclb.NewDeleteUpdate(addr), clientv3.WithLease(lid))
+	return r.Update(c.Ctx(), service, grpclb.AddServer(addr, grpclb.WeightLvl(weight)), clientv3.WithLease(lid))
 }
 
 func main() {

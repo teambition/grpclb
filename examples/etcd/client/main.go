@@ -3,14 +3,13 @@ package main
 import (
 	"flag"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
+	"code.teambition.com/soa/go-lib/grpc/grpclb"
+	"code.teambition.com/soa/go-lib/grpc/grpclb/examples/helloworld"
 	"github.com/coreos/etcd/clientv3"
 	etcdnaming "github.com/coreos/etcd/clientv3/naming"
-	"github.com/teambition/grpclb"
-	"github.com/teambition/grpclb/examples/helloworld"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"gopkg.in/mgo.v2/bson"
@@ -35,18 +34,15 @@ func main() {
 	}
 	defer conn.Close()
 	c := helloworld.NewGreeterClient(conn)
-	count := map[string]int{}
-	for i := 0; i <= 10000; i++ {
+	for {
 		timeoutCtx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 		id := bson.NewObjectId().Hex()
-		res, err := c.SayHello(grpclb.StrOrNumToContext(timeoutCtx, id), &helloworld.HelloRequest{Name: strconv.Itoa(i)})
+		res, err := c.SayHello(grpclb.StrOrNumToContext(timeoutCtx, id), &helloworld.HelloRequest{Name: id})
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		count[res.Message]++
-	}
-	for k, v := range count {
-		log.Printf("server: %s, count: %d\n", k, v)
+		log.Printf("server: %s, id: %s\n", res.Message, id)
+		time.Sleep(200 * time.Millisecond)
 	}
 }
